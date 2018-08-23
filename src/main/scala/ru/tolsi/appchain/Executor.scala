@@ -1,4 +1,4 @@
-package ru.tolsi.appchain.execution
+package ru.tolsi.appchain
 
 import monix.eval.Task
 import spray.json.JsValue

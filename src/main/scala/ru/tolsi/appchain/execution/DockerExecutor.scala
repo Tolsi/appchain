@@ -1,7 +1,9 @@
 package ru.tolsi.appchain.execution
 
 import java.nio.ByteBuffer
+import java.util.concurrent.TimeoutException
 
+import akka.util.Timeout
 import com.softwaremill.sttp._
 import com.softwaremill.sttp.SttpBackend
 import com.softwaremill.sttp.asynchttpclient.monix.AsyncHttpClientMonixBackend
@@ -12,24 +14,22 @@ import monix.eval.Task
 import monix.execution.Scheduler
 import monix.execution.schedulers.SchedulerService
 import monix.reactive.Observable
+import ru.tolsi.appchain.Executor
 import spray.json.{DefaultJsonProtocol, JsValue}
 
-import scala.concurrent.Await
-import scala.concurrent.duration._
-import scala.util.Try
 import scala.collection.JavaConverters._
 
-class DockerExecutor(docker: DefaultDockerClient) extends Executor with DefaultJsonProtocol {
+class DockerExecutor(docker: DefaultDockerClient)(implicit timeout: Timeout) extends Executor with DefaultJsonProtocol {
   private implicit val io: SchedulerService = Scheduler.io(name = "contracts-requests")
-  private implicit val sttpBackend: SttpBackend[Task, Observable[ByteBuffer]] = AsyncHttpClientMonixBackend()
+  private implicit val sttpBackend: SttpBackend[Task, Observable[ByteBuffer]] = AsyncHttpClientMonixBackend(SttpBackendOptions.connectionTimeout(timeout.duration))
 
   def stop(): Unit = {
     sttpBackend.close()
     io.shutdown()
   }
 
-  private def startAppContainer(appName: String): Either[Throwable, ContainerInfo] = {
-    Try(docker.inspectContainer(appName)).toEither.map(cs => {
+  private def startAppContainer(appName: String): Task[ContainerInfo] = {
+    Task(docker.inspectContainer(appName)).map(cs => {
       if (!cs.state().running()) {
         docker.startContainer(appName)
       }
@@ -37,27 +37,26 @@ class DockerExecutor(docker: DefaultDockerClient) extends Executor with DefaultJ
     })
   }
 
-  override def execute(appName: String, params: JsValue): Task[String] = Task {
-    startAppContainer(appName).left.flatMap(_ => throw new IllegalStateException("App container isn't exists")).map(cs => {
-      val bindedPort = cs.networkSettings().ports().asScala.head._2.asScala.head.hostPort()
+  private def makeContractRequest[B: BodySerializer](appName: String, uriWithPort: Int => Uri, body: B): Task[String] = {
+    startAppContainer(appName).flatMap(cs => {
+      val bindedPort = cs.networkSettings().ports().asScala.head._2.asScala.head.hostPort().toInt
 
-      val resultF = sttp.body(params.toJson)
-        .post(uri"http://localhost:$bindedPort/execute")
+      val resultF = sttp.body(body)
+        .post(uriWithPort(bindedPort))
         .send()
 
-      Await.result(resultF.map(_.body.right.get).runAsync, 1 minute)
-    }).right.get
+      resultF.map(_.body.right.get).timeoutTo(timeout.duration, Task {
+        docker.killContainer(appName)
+        throw new TimeoutException("Contract call timeout")
+      })
+    })
   }
 
-  override def apply(appName: String, params: JsValue, result: JsValue): Task[String] = Task {
-    startAppContainer(appName).left.flatMap(_ => throw new IllegalStateException("App container isn't exists")).map(cs => {
-      val bindedPort = cs.networkSettings().ports().asScala.head._2.asScala.head.hostPort()
+  override def execute(appName: String, params: JsValue): Task[String] = {
+    makeContractRequest(appName, bindedPort => uri"http://localhost:$bindedPort/execute", params)
+  }
 
-      val resultF = sttp.body(Map("parameters" -> params, "result" -> result).toJson)
-        .post(uri"http://localhost:$bindedPort/apply")
-        .send()
-
-      Await.result(resultF.map(_.body.right.get).runAsync, 1 minute)
-    }).right.get
+  override def apply(appName: String, params: JsValue, result: JsValue): Task[String] = {
+    makeContractRequest(appName, bindedPort => uri"http://localhost:$bindedPort/apply", Map("parameters" -> params, "result" -> result).toJson)
   }
 }
