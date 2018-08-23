@@ -15,7 +15,7 @@ class DockerDeployer(docker: DefaultDockerClient) extends Deployer {
 
   override def deploy(contract: Contract): Task[String] = Task {
     import contract._
-    val containerStatus = Try(docker.inspectContainer(appName)).toEither
+    val containerStatus = Try(docker.inspectContainer(containerName)).toEither
 
     if (containerStatus.isLeft) {
       docker.pull(image)
@@ -23,7 +23,7 @@ class DockerDeployer(docker: DefaultDockerClient) extends Deployer {
         .image(image)
         .hostConfig(hostConfig)
         .exposedPorts("5000")
-        .build, appName)
+        .build, containerName)
       container.id()
     } else {
       containerStatus.right.get.id()

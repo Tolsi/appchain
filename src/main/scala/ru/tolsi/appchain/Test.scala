@@ -33,18 +33,18 @@ object Test extends DefaultJsonProtocol {
     //Contract("slow-init-contract-1", "localhost:5000/slow-init-contract")
     //Contract("sleep-contract-1", "localhost:5000/sleep-contract")
     try {
-      val c = Contract("sleep-contract-1", "localhost:5000/sleep-contract")
+      val c = Contract("sleep-contract", "localhost:5000/sleep-contract", 1)
 
       val params = Map("execute_sleep" -> 4.7, "apply_sleep" -> 4.7).toJson
 
       val resultF = deployer.deploy(c).flatMap(_ =>
-        executor.execute(c.appName, params)).runAsync
+        executor.execute(c.containerName, params)).runAsync
 
       val result = Await.result(resultF, 1 minute)
 
       println(result)
 
-      docker.stopContainer(c.appName, 1)
+      docker.stopContainer(c.containerName, 1)
 
       println(s"Done!")
     } catch { case NonFatal(e) =>
