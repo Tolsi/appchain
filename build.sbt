@@ -18,6 +18,7 @@ libraryDependencies ++= Seq(
   "org.scorexfoundation" %% "scrypto" % "2.1.2",
   "com.spotify" % "docker-client" % "8.11.7",
   "com.softwaremill.sttp" %% "core" % "1.3.0",
-  "com.softwaremill.sttp" %% "akka-http-backend" % "1.3.0",
-  "com.softwaremill.sttp" %% "spray-json" % "1.3.0"
+  "com.softwaremill.sttp" %% "async-http-client-backend-monix" % "1.3.0",
+  "com.softwaremill.sttp" %% "spray-json" % "1.3.0",
+  "io.monix" %% "monix" % "3.0.0-RC1"
 )

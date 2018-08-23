@@ -3,8 +3,8 @@ package ru.tolsi.appchain
 
 import java.util
 
-import com.spotify.docker.client.{DefaultDockerClient, DockerClient}
 import com.spotify.docker.client.messages.{ContainerConfig, HostConfig, PortBinding}
+import com.spotify.docker.client.{DefaultDockerClient, DockerClient}
 // Create a client based on DOCKER_HOST and DOCKER_CERT_PATH env vars// Create a client based on DOCKER_HOST and DOCKER_CERT_PATH env vars
 
 object DockerClientExample extends App {
