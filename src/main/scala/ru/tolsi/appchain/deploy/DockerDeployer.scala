@@ -4,6 +4,7 @@ import akka.util.Timeout
 import com.spotify.docker.client.DefaultDockerClient
 import com.spotify.docker.client.messages.{ContainerConfig, HostConfig, PortBinding}
 import monix.eval.Task
+import org.apache.commons.io.FileUtils
 import ru.tolsi.appchain.{Contract, Deployer}
 
 import scala.util.Try
@@ -11,7 +12,7 @@ import scala.collection.JavaConverters._
 
 class DockerDeployer(docker: DefaultDockerClient) extends Deployer {
   private val portBindings = Map("5000" -> List(PortBinding.randomPort("0.0.0.0")).asJava)
-  private val hostConfig = HostConfig.builder.portBindings(portBindings.asJava).build
+  private val hostConfig = HostConfig.builder.portBindings(portBindings.asJava).memory(256 * FileUtils.ONE_MB).build
 
   override def deploy(contract: Contract): Task[String] = Task {
     import contract._
