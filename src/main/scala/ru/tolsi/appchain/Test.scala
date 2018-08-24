@@ -5,6 +5,7 @@ import com.spotify.docker.client.DefaultDockerClient
 import com.spotify.docker.client.messages.RegistryAuth
 import monix.execution.Scheduler
 import monix.execution.schedulers.SchedulerService
+import org.apache.commons.io.FileUtils
 import ru.tolsi.appchain.deploy.DockerDeployer
 import ru.tolsi.appchain.execution.DockerExecutor
 import spray.json.DefaultJsonProtocol
@@ -29,13 +30,14 @@ object Test extends DefaultJsonProtocol {
     val deployer = new DockerDeployer(docker)
     val executor = new DockerExecutor(docker)(Timeout(5 seconds))
 
-    //Contract("sum-contract-1", "localhost:5000/sum-contract")
-    //Contract("slow-init-contract-1", "localhost:5000/slow-init-contract")
-    //Contract("sleep-contract-1", "localhost:5000/sleep-contract")
+    //Contract("sum-contract", "localhost:5000/sum-contract")
+    //Contract("slow-init-contract", "localhost:5000/slow-init-contract")
+    //Contract("sleep-contract", "localhost:5000/sleep-contract")
+    //Contract("memory-allocate-contract", "localhost:5000/memory-allocate-contract")
     try {
-      val c = Contract("sleep-contract", "localhost:5000/sleep-contract", 1)
+      val c = Contract("memory-allocate-contract", "localhost:5000/memory-allocate-contract", 1)
 
-      val params = Map("execute_sleep" -> 4.7, "apply_sleep" -> 4.7).toJson
+      val params = Map("allocate" -> 223 * FileUtils.ONE_MB).toJson
 
       val resultF = deployer.deploy(c).flatMap(_ =>
         executor.execute(c.containerName, params)).runAsync
@@ -44,7 +46,8 @@ object Test extends DefaultJsonProtocol {
 
       println(result)
 
-      docker.stopContainer(c.containerName, 1)
+      docker.killContainer(c.containerName)
+      docker.removeContainer(c.containerName)
 
       println(s"Done!")
     } catch { case NonFatal(e) =>

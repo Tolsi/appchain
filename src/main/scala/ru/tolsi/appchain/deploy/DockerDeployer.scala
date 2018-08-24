@@ -12,7 +12,10 @@ import scala.collection.JavaConverters._
 
 class DockerDeployer(docker: DefaultDockerClient) extends Deployer {
   private val portBindings = Map("5000" -> List(PortBinding.randomPort("0.0.0.0")).asJava)
-  private val hostConfig = HostConfig.builder.portBindings(portBindings.asJava).memory(256 * FileUtils.ONE_MB).build
+  private val hostConfig = HostConfig.builder.portBindings(portBindings.asJava)
+    .memory(128 * FileUtils.ONE_MB)
+    .memorySwap(0L)
+    .build
 
   override def deploy(contract: Contract): Task[String] = Task {
     import contract._
