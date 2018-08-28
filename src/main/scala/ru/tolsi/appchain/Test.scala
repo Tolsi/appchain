@@ -8,11 +8,11 @@ import monix.execution.schedulers.SchedulerService
 import org.apache.commons.io.FileUtils
 import ru.tolsi.appchain.deploy.DockerDeployer
 import ru.tolsi.appchain.execution.DockerExecutor
-import spray.json.DefaultJsonProtocol
-import spray.json._
+import spray.json.{DefaultJsonProtocol, _}
 
 import scala.concurrent.Await
 import scala.concurrent.duration._
+import scala.util.Try
 import scala.util.control.NonFatal
 
 object Test extends DefaultJsonProtocol {
@@ -34,25 +34,31 @@ object Test extends DefaultJsonProtocol {
     //Contract("slow-init-contract", "localhost:5000/slow-init-contract")
     //Contract("sleep-contract", "localhost:5000/sleep-contract")
     //Contract("memory-allocate-contract", "localhost:5000/memory-allocate-contract")
-    try {
-      val c = Contract("memory-allocate-contract", "localhost:5000/memory-allocate-contract", 1)
 
-      val params = Map("allocate" -> 223 * FileUtils.ONE_MB).toJson
+    val c = Contract("memory-allocate-contract", "localhost:5000/memory-allocate-contract", 1)
+
+    try {
+      val params = Map("allocate" -> 100 * FileUtils.ONE_MB).toJson
 
       val resultF = deployer.deploy(c).flatMap(_ =>
-        executor.execute(c.containerName, params)).runAsync
+        executor.execute(c, params)).runAsync
 
-      val result = Await.result(resultF, 1 minute)
+      val result = Await.result(resultF, 5 minutes)
 
       println(result)
 
-      docker.killContainer(c.containerName)
-      docker.removeContainer(c.containerName)
-
       println(s"Done!")
-    } catch { case NonFatal(e) =>
+    } catch {
+      case NonFatal(e) =>
         e.printStackTrace()
     } finally {
+      Try(docker.killContainer(c.containerName))
+      Try(docker.killContainer(c.stateContainerName))
+
+      Try(docker.removeContainer(c.containerName))
+      Try(docker.removeContainer(c.stateContainerName))
+      Try(docker.removeVolume(c.stateVolumeName))
+
       executor.stop()
       docker.close()
     }

@@ -20,5 +20,6 @@ libraryDependencies ++= Seq(
   "com.softwaremill.sttp" %% "core" % "1.3.0",
   "com.softwaremill.sttp" %% "async-http-client-backend-monix" % "1.3.0",
   "com.softwaremill.sttp" %% "spray-json" % "1.3.0",
-  "io.monix" %% "monix" % "3.0.0-RC1"
+  "io.monix" %% "monix" % "3.0.0-RC1",
+  "com.h2database" % "h2" % "1.4.197"
 )
