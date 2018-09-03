@@ -12,6 +12,7 @@ import scala.collection.JavaConverters._
 
 class DockerDeployer(docker: DefaultDockerClient) extends Deployer {
   private val portBindings = Map("5000" -> List(PortBinding.randomPort("0.0.0.0")).asJava)
+  private val statePortBindings = Map("5432" -> List(PortBinding.randomPort("0.0.0.0")).asJava)
 
   private val commonHostBuilder = HostConfig.builder
     .memory(128 * FileUtils.ONE_MB)
@@ -19,12 +20,13 @@ class DockerDeployer(docker: DefaultDockerClient) extends Deployer {
 
   private def contractHostConfig(stateContainerName: String) = commonHostBuilder
     .portBindings(portBindings.asJava)
-    .links(stateContainerName)
+    .links(s"$stateContainerName:state")
     .build
 
-  private val dbImage = "oscarfonts/h2:alpine"
+  private val dbImage = "postgres:10.5-alpine"
   private def stateHostConfig(contract: Contract, stateVolume: Volume) =commonHostBuilder
-    .binds(Bind.from(stateVolume).to("/opt/h2-data").build())
+    .binds(Bind.from(stateVolume).to("/var/lib/postgresql/data").build())
+    .portBindings(statePortBindings.asJava)
     .build
 
   private def deployContract(contract: Contract): Unit = {
@@ -44,6 +46,7 @@ class DockerDeployer(docker: DefaultDockerClient) extends Deployer {
     docker.createContainer(ContainerConfig.builder
       .image(dbImage)
       .hostConfig(stateHostConfig(contract, stateVolume))
+      .exposedPorts("5432")
       .build, stateContainerName)
   }
 

@@ -35,7 +35,7 @@ object Test extends DefaultJsonProtocol {
     //Contract("sleep-contract", "localhost:5000/sleep-contract")
     //Contract("memory-allocate-contract", "localhost:5000/memory-allocate-contract")
 
-    val c = Contract("memory-allocate-contract", "localhost:5000/memory-allocate-contract", 1)
+    val c = Contract("simple-sql-contact", "localhost:5000/simple-sql-contact", 1)
 
     try {
       val params = Map("allocate" -> 100 * FileUtils.ONE_MB).toJson

@@ -16,7 +16,7 @@ libraryDependencies ++= Seq(
   "com.typesafe.akka" %% "akka-http-testkit" % "10.1.0" % "test",
   "com.typesafe.akka" %% "akka-http-spray-json" % "10.1.0",
   "org.scorexfoundation" %% "scrypto" % "2.1.2",
-  "com.spotify" % "docker-client" % "8.11.7",
+  "com.spotify" % "docker-client" % "8.12.0",
   "com.softwaremill.sttp" %% "core" % "1.3.0",
   "com.softwaremill.sttp" %% "async-http-client-backend-monix" % "1.3.0",
   "com.softwaremill.sttp" %% "spray-json" % "1.3.0",

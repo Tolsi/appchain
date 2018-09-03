@@ -1,5 +1,7 @@
 package ru.tolsi.appchain.execution
 
+import java.io.PrintWriter
+import java.net.{InetSocketAddress, Socket}
 import java.nio.ByteBuffer
 
 import akka.util.Timeout
@@ -7,7 +9,8 @@ import com.softwaremill.sttp.asynchttpclient.monix.AsyncHttpClientMonixBackend
 import com.softwaremill.sttp.json.sprayJson._
 import com.softwaremill.sttp.{SttpBackend, _}
 import com.spotify.docker.client.DefaultDockerClient
-import com.spotify.docker.client.messages.ContainerInfo
+import com.spotify.docker.client.DockerClient.LogsParam
+import com.spotify.docker.client.messages.{ContainerInfo, NetworkSettings}
 import monix.eval.Task
 import monix.execution.Scheduler
 import monix.execution.schedulers.SchedulerService
@@ -16,6 +19,7 @@ import ru.tolsi.appchain.{Contract, Executor}
 import spray.json.{DefaultJsonProtocol, JsValue}
 
 import scala.collection.JavaConverters._
+import scala.util.Try
 
 class DockerExecutor(docker: DefaultDockerClient)(implicit timeout: Timeout) extends Executor with DefaultJsonProtocol {
   private implicit val io: SchedulerService = Scheduler.io(name = "contracts-requests")
@@ -26,17 +30,49 @@ class DockerExecutor(docker: DefaultDockerClient)(implicit timeout: Timeout) ext
     io.shutdown()
   }
 
-  private def startContainer(containerName: String): Task[ContainerInfo] = {
-    Task(docker.inspectContainer(containerName)).map(cs => {
+  private def checkHostPort(host: String, port: Int): Task[Boolean] = Task {
+    Try {
+      val s = new Socket()
+      try {
+        s.connect(new InetSocketAddress(host, port), 1000)
+      } finally {
+        s.close()
+      }
+    }.isSuccess
+  }
+
+  private def waitInLog(containerId: String, str: String): Task[Boolean] = Task {
+    docker.logs(containerId, Seq(
+      LogsParam.timestamps(false),
+      LogsParam.follow(false),
+      LogsParam.stderr(false),
+      LogsParam.stdout(true),
+      LogsParam.tail(100)): _*).readFully().contains(str)
+  }
+
+  private def extractBindedPortFromNetworkSettings(port: Int)(settings: NetworkSettings): Int = {
+    settings.ports().asScala(s"$port/tcp").asScala.head.hostPort().toInt
+  }
+
+  private def startContainer(containerName: String, testPort: NetworkSettings => Int, waitStringInLog: Option[String] = None): Task[ContainerInfo] = {
+    Task(docker.inspectContainer(containerName)).flatMap(cs => {
       if (!cs.state().running()) {
         docker.startContainer(containerName)
       }
-      docker.inspectContainer(containerName)
+      checkHostPort("localhost", testPort(docker.inspectContainer(containerName).networkSettings())).restartUntil(identity).flatMap(_ =>
+        waitStringInLog match {
+          case Some(str) => waitInLog(cs.id(), str).restartUntil(identity)
+          case None => Task.unit
+        }
+      ).map(_ =>
+        docker.inspectContainer(containerName)
+      )
     })
   }
 
   private def makeContractRequest[B: BodySerializer](contract: Contract, uriWithPort: Int => Uri, body: B): Task[String] = {
-    startContainer(contract.stateContainerName).flatMap(_ => startContainer(contract.containerName)).flatMap(cs => {
+    startContainer(contract.stateContainerName, extractBindedPortFromNetworkSettings(5432), Some("database system is ready to accept connections")).flatMap(_ =>
+      startContainer(contract.containerName, extractBindedPortFromNetworkSettings(5000))).flatMap(cs => {
       val bindedPorts = cs.networkSettings().ports().asScala
       val bindedHttpPort = bindedPorts.head._2.asScala.head.hostPort().toInt
 
@@ -44,7 +80,9 @@ class DockerExecutor(docker: DefaultDockerClient)(implicit timeout: Timeout) ext
         .post(uriWithPort(bindedHttpPort))
         .send()
 
-      resultF.map(_.body.right.get).timeout(timeout.duration).doOnFinish(eo => Task {
+      resultF.map(r =>
+        r.body.right.get
+      ).timeout(timeout.duration).doOnFinish(eo => Task {
         // todo to kill or not to kill?
         eo.foreach(_ => {
           docker.killContainer(contract.containerName)
