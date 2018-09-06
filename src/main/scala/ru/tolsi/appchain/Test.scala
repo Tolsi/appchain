@@ -26,7 +26,7 @@ object Test extends DefaultJsonProtocol with StrictLogging {
     docker.ping()
 
     val deployer = new DockerDeployer(docker)
-    val executor = new DockerExecutor(docker)(Timeout(5 seconds))
+    val executor = new DockerExecutor(docker, ContractExecutionLimits(1000, 1000, Timeout(5 seconds)))
 
     //Contract("sum-contract", "localhost:5000/sum-contract")
     //Contract("slow-init-contract", "localhost:5000/slow-init-contract")

@@ -1,17 +1,17 @@
 package ru.tolsi.appchain.execution
 
-import akka.util.Timeout
 import com.spotify.docker.client.DockerClient.{ExecCreateParam, LogsParam}
 import com.spotify.docker.client.messages.{ContainerInfo, NetworkSettings}
 import com.spotify.docker.client.{DefaultDockerClient, LogStream}
+import com.typesafe.scalalogging.StrictLogging
 import monix.eval.Task
 import org.apache.commons.lang.StringEscapeUtils
-import ru.tolsi.appchain.{Contract, Executor}
+import ru.tolsi.appchain.{Contract, ContractExecutionLimits, Executor}
 import spray.json.{DefaultJsonProtocol, JsValue}
 
 import scala.collection.JavaConverters._
 
-class DockerExecutor(docker: DefaultDockerClient)(implicit timeout: Timeout) extends Executor with DefaultJsonProtocol {
+class DockerExecutor(docker: DefaultDockerClient, override val contractExecutionLimits: ContractExecutionLimits) extends Executor with DefaultJsonProtocol with StrictLogging {
 
   private def waitInLog(containerId: String, str: String): Task[Boolean] = Task {
     docker.logs(containerId, Seq(
@@ -48,10 +48,11 @@ class DockerExecutor(docker: DefaultDockerClient)(implicit timeout: Timeout) ext
       stream = docker.execStart(execId)
       val result = stream.readFully()
       val inspect = docker.execInspect(execId)
+      logger.debug(s"Process was finished with code ${inspect.exitCode()}: $result")
       if (inspect.exitCode() == 0) {
         result.split("\n").last
       } else {
-        throw new Exception(s"Process was failed with code ${inspect.exitCode()}: $result")
+        throw new Exception(s"Process was failed with code ${inspect.exitCode()}")
       }
     } finally {
       if (stream != null)
@@ -66,8 +67,8 @@ class DockerExecutor(docker: DefaultDockerClient)(implicit timeout: Timeout) ext
         "iptables -P INPUT DROP && iptables -P OUTPUT DROP && iptables -P FORWARD DROP && " +
         "iptables -A OUTPUT -p tcp --dport 5432 -d $(ifconfig | grep -A 1 'eth0' | tail -1 | cut -d ':' -f 2 | cut -d ' ' -f 1 | sed 's/4$/3/') -j ACCEPT && " +
         "iptables -A INPUT -p tcp --sport 5432 -s $(ifconfig | grep -A 1 'eth0' | tail -1 | cut -d ':' -f 2 | cut -d ' ' -f 1 | sed 's/4$/3/') -j ACCEPT && " +
-        "echo \"$(ifconfig | grep -A 1 'eth0' | tail -1 | cut -d ':' -f 2 | cut -d ' ' -f 1 | sed 's/4$/3/') state\" >> /etc/hosts && "), privileged = true).flatMap(_ => {
-        executeCommandInContainer(cs.id(), Array[String]("/bin/sh", "-c", s"/run.sh ${StringEscapeUtils.escapeJavaScript(body.toString())}")).timeout(timeout.duration)
+        "echo \"$(ifconfig | grep -A 1 'eth0' | tail -1 | cut -d ':' -f 2 | cut -d ' ' -f 1 | sed 's/4$/3/') state\" >> /etc/hosts"), privileged = true).flatMap(_ => {
+        executeCommandInContainer(cs.id(), Array[String]("/bin/sh", "-c", s"/run.sh ${StringEscapeUtils.escapeJavaScript(body.toString())}")).timeout(contractExecutionLimits.timeout.duration)
           .doOnFinish(eo => Task {
             // todo to kill or not to kill?
             eo.foreach(_ => {
@@ -81,10 +82,22 @@ class DockerExecutor(docker: DefaultDockerClient)(implicit timeout: Timeout) ext
   }
 
   override def execute(contract: Contract, params: JsValue): Task[String] = {
-    makeContractRequest(contract, params)
+    if (params.toString().length > contractExecutionLimits.inputParamsMaxLength) {
+      Task.raiseError(new IllegalArgumentException("params are too long"))
+    } else makeContractRequest(contract, params).flatMap(r =>
+      if (r.length > contractExecutionLimits.resultMaxLength) {
+        Task.raiseError(new IllegalArgumentException("result is too long"))
+      } else Task.now(r))
   }
 
   override def apply(contract: Contract, params: JsValue, result: JsValue): Task[String] = {
-    makeContractRequest(contract, Map("parameters" -> params, "result" -> result).toJson)
+    if (params.toString().length > contractExecutionLimits.inputParamsMaxLength) {
+      Task.raiseError(new IllegalArgumentException("params are too long"))
+    } else if (result.toString().length > contractExecutionLimits.inputParamsMaxLength) {
+      Task.raiseError(new IllegalArgumentException("result is too long"))
+    } else makeContractRequest(contract, Map("parameters" -> params, "result" -> result).toJson).flatMap(r =>
+      if (r.length > contractExecutionLimits.resultMaxLength) {
+        Task.raiseError(new IllegalArgumentException("result is too long"))
+      } else Task.now(r))
   }
 }
