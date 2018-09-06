@@ -1,24 +1,22 @@
-from flask import Flask, abort, request
 import json
 import time
-
-app = Flask(__name__)
-
-@app.route('/execute', methods=['POST'])
-def execute():
-    if not request.json or not 'execute_sleep' in request.json or not 'apply_sleep' in request.json:
-        abort(400)
-    time.sleep(request.json['execute_sleep'])
-    return json.dumps(True)
-
-@app.route('/apply', methods=['POST'])
-def apply():
-    if not request.json or not 'execute_sleep' in request.json['parameters'] or not 'apply_sleep' in request.json['parameters']:
-        abort(400)
-
-    time.sleep(request.json['parameters']['apply_sleep'])
-
-    return json.dumps(True)
+import sys
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000, debug=True)
+    request = json.loads(sys.argv[1])
+    if request['command'] == 'execute':
+        if not 'execute_sleep' in request['params'] or not 'apply_sleep' in request['params']:
+            sys.exit(1)
+
+        time.sleep(request['params']['execute_sleep'])
+
+        print(json.dumps(True))
+    elif request['command'] == 'apply':
+        if not 'execute_sleep' in request['params']['parameters'] or not 'apply_sleep' in request['params']['parameters']:
+            sys.exit(1)
+
+        time.sleep(request['params']['parameters']['apply_sleep'])
+
+        print(json.dumps(True))
+    else:
+        sys.exit(1)

@@ -1,32 +1,38 @@
 package ru.tolsi.appchain.deploy
 
+import java.io.File
+import java.nio.charset.StandardCharsets
+
+import com.google.common.io.Files
 import com.spotify.docker.client.DefaultDockerClient
 import com.spotify.docker.client.messages.HostConfig.Bind
-import com.spotify.docker.client.messages.{ContainerConfig, HostConfig, PortBinding, Volume}
+import com.spotify.docker.client.messages._
 import monix.eval.Task
 import org.apache.commons.io.FileUtils
 import ru.tolsi.appchain.{Contract, Deployer}
 
 import scala.util.Try
-import scala.collection.JavaConverters._
 
 class DockerDeployer(docker: DefaultDockerClient) extends Deployer {
-  private val portBindings = Map("5000" -> List(PortBinding.randomPort("0.0.0.0")).asJava)
-  private val statePortBindings = Map("5432" -> List(PortBinding.randomPort("0.0.0.0")).asJava)
+  //  private val statePortBindings = Map("5432" -> List(PortBinding.randomPort("0.0.0.0")).asJava)
 
   private val commonHostBuilder = HostConfig.builder
     .memory(128 * FileUtils.ONE_MB)
     .memorySwap(0L)
 
-  private def contractHostConfig(stateContainerName: String) = commonHostBuilder
-    .portBindings(portBindings.asJava)
-    .links(s"$stateContainerName:state")
-    .build
+  private def contractHostConfig(stateContainerName: String) = {
+    commonHostBuilder
+      //    .links(s"$stateContainerName:state")
+      .binds(Bind.from("/tmp/true_random").to("/dev/random").readOnly(true).build())
+      .build
+  }
 
   private val dbImage = "postgres:10.5-alpine"
-  private def stateHostConfig(contract: Contract, stateVolume: Volume) =commonHostBuilder
+
+  private def stateHostConfig(contract: Contract, stateVolume: Volume) = commonHostBuilder
+    .binds(Bind.from("/tmp/true_random").to("/dev/random").readOnly(true).build())
     .binds(Bind.from(stateVolume).to("/var/lib/postgresql/data").build())
-    .portBindings(statePortBindings.asJava)
+    //    .portBindings(statePortBindings.asJava)
     .build
 
   private def deployContract(contract: Contract): Unit = {
@@ -35,7 +41,6 @@ class DockerDeployer(docker: DefaultDockerClient) extends Deployer {
     docker.createContainer(ContainerConfig.builder
       .image(image)
       .hostConfig(contractHostConfig(stateContainerName))
-      .exposedPorts("5000")
       .build, containerName)
   }
 
@@ -56,6 +61,7 @@ class DockerDeployer(docker: DefaultDockerClient) extends Deployer {
 
   override def deploy(contract: Contract): Task[Unit] = Task {
     if (!isDeployed(contract)) {
+      Files.write("truerandom", new File("/tmp/true_random"), StandardCharsets.UTF_8)
       deployContractState(contract)
       deployContract(contract)
     }

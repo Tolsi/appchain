@@ -3,9 +3,9 @@ package ru.tolsi.appchain
 import akka.util.Timeout
 import com.spotify.docker.client.DefaultDockerClient
 import com.spotify.docker.client.messages.RegistryAuth
+import com.typesafe.scalalogging.StrictLogging
 import monix.execution.Scheduler
 import monix.execution.schedulers.SchedulerService
-import org.apache.commons.io.FileUtils
 import ru.tolsi.appchain.deploy.DockerDeployer
 import ru.tolsi.appchain.execution.DockerExecutor
 import spray.json.{DefaultJsonProtocol, _}
@@ -15,15 +15,13 @@ import scala.concurrent.duration._
 import scala.util.Try
 import scala.util.control.NonFatal
 
-object Test extends DefaultJsonProtocol {
+object Test extends DefaultJsonProtocol with StrictLogging {
   def main(args: Array[String]): Unit = {
     implicit val io: SchedulerService = Scheduler.forkJoin(10, 10)
 
     val docker = DefaultDockerClient.fromEnv.build
 
-    val registryAuth = RegistryAuth.builder.serverAddress("localhost:5000").build
-    val statusCode = docker.auth(registryAuth)
-    println(statusCode)
+    docker.auth(RegistryAuth.builder.serverAddress("localhost:5000").build)
 
     docker.ping()
 
@@ -35,19 +33,19 @@ object Test extends DefaultJsonProtocol {
     //Contract("sleep-contract", "localhost:5000/sleep-contract")
     //Contract("memory-allocate-contract", "localhost:5000/memory-allocate-contract")
 
+    //    val c = Contract("sleep-contract", "localhost:5000/sleep-contract", 1)
     val c = Contract("simple-sql-contact", "localhost:5000/simple-sql-contact", 1)
 
     try {
-      val params = Map("allocate" -> 100 * FileUtils.ONE_MB).toJson
-
+      val params = Map("command" -> "execute".toJson, "params" -> Map("apply_sleep" -> 0.1, "execute_sleep" -> 0.1).toJson).toJson
       val resultF = deployer.deploy(c).flatMap(_ =>
         executor.execute(c, params)).runAsync
 
       val result = Await.result(resultF, 5 minutes)
 
-      println(result)
+      logger.info(s"Result: $result")
 
-      println(s"Done!")
+      logger.info(s"Done!")
     } catch {
       case NonFatal(e) =>
         e.printStackTrace()
@@ -59,7 +57,6 @@ object Test extends DefaultJsonProtocol {
       Try(docker.removeContainer(c.stateContainerName))
       Try(docker.removeVolume(c.stateVolumeName))
 
-      executor.stop()
       docker.close()
     }
   }

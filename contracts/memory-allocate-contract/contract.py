@@ -1,32 +1,25 @@
-from flask import Flask, abort, request
 import json
 import time
-
-app = Flask(__name__)
-
-
-@app.route('/execute', methods=['POST'])
-def execute():
-    if not request.json or not 'allocate' in request.json:
-        abort(400)
-    global omfg
-    omfg = bytearray(request.json['allocate'])
-
-    time.sleep(2)
-
-    return json.dumps(True)
-
-@app.route('/apply', methods=['POST'])
-def apply():
-    if not request.json or not 'allocate' in request.json['parameters']:
-        abort(400)
-
-    global omfg
-    omfg = bytearray(request.json['parameters']['allocate'])
-
-    time.sleep(2)
-
-    return json.dumps(True)
+import sys
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000, debug=True)
+    request = json.loads(sys.argv[1])
+    if request['command'] == 'execute':
+        if not request['params'] or not 'allocate' in request['params']:
+            sys.exit(400)
+        global omfg
+        omfg = bytearray(request['params']['allocate'])
+
+        time.sleep(2)
+
+        print(json.dumps(True))
+    elif request['command'] == 'apply':
+        if not request['params'] or not 'allocate' in request['params']['parameters']:
+            sys.exit(400)
+
+        global omfg
+        omfg = bytearray(request['params']['parameters']['allocate'])
+
+        time.sleep(2)
+
+        print(json.dumps(True))
