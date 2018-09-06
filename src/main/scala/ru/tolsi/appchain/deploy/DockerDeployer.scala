@@ -14,23 +14,16 @@ import ru.tolsi.appchain.{Contract, Deployer}
 import scala.util.Try
 
 class DockerDeployer(docker: DefaultDockerClient) extends Deployer {
-  //  private val statePortBindings = Map("5432" -> List(PortBinding.randomPort("0.0.0.0")).asJava)
 
   private val commonHostBuilder = HostConfig.builder
     .memory(128 * FileUtils.ONE_MB)
     .memorySwap(0L)
 
-  private def contractHostConfig(stateContainerName: String) = {
-    commonHostBuilder
-      //    .links(s"$stateContainerName:state")
-      .binds(Bind.from("/tmp/true_random").to("/dev/random").readOnly(true).build())
-      .build
-  }
+  private def contractHostConfig(stateContainerName: String) = commonHostBuilder.build
 
   private val dbImage = "postgres:10.5-alpine"
 
   private def stateHostConfig(contract: Contract, stateVolume: Volume) = commonHostBuilder
-    .binds(Bind.from("/tmp/true_random").to("/dev/random").readOnly(true).build())
     .binds(Bind.from(stateVolume).to("/var/lib/postgresql/data").build())
     //    .portBindings(statePortBindings.asJava)
     .build
@@ -61,7 +54,6 @@ class DockerDeployer(docker: DefaultDockerClient) extends Deployer {
 
   override def deploy(contract: Contract): Task[Unit] = Task {
     if (!isDeployed(contract)) {
-      Files.write("truerandom", new File("/tmp/true_random"), StandardCharsets.UTF_8)
       deployContractState(contract)
       deployContract(contract)
     }

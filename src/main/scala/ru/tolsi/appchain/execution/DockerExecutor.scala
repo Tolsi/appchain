@@ -66,8 +66,7 @@ class DockerExecutor(docker: DefaultDockerClient)(implicit timeout: Timeout) ext
         "iptables -P INPUT DROP && iptables -P OUTPUT DROP && iptables -P FORWARD DROP && " +
         "iptables -A OUTPUT -p tcp --dport 5432 -d $(ifconfig | grep -A 1 'eth0' | tail -1 | cut -d ':' -f 2 | cut -d ' ' -f 1 | sed 's/4$/3/') -j ACCEPT && " +
         "iptables -A INPUT -p tcp --sport 5432 -s $(ifconfig | grep -A 1 'eth0' | tail -1 | cut -d ':' -f 2 | cut -d ' ' -f 1 | sed 's/4$/3/') -j ACCEPT && " +
-        "echo \"$(ifconfig | grep -A 1 'eth0' | tail -1 | cut -d ':' -f 2 | cut -d ' ' -f 1 | sed 's/4$/3/') state\" >> /etc/hosts && " +
-        "rm /dev/urandom && ln -s /dev/random /dev/urandom"), privileged = true).flatMap(_ => {
+        "echo \"$(ifconfig | grep -A 1 'eth0' | tail -1 | cut -d ':' -f 2 | cut -d ' ' -f 1 | sed 's/4$/3/') state\" >> /etc/hosts && "), privileged = true).flatMap(_ => {
         executeCommandInContainer(cs.id(), Array[String]("/bin/sh", "-c", s"/run.sh ${StringEscapeUtils.escapeJavaScript(body.toString())}")).timeout(timeout.duration)
           .doOnFinish(eo => Task {
             // todo to kill or not to kill?
