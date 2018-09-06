@@ -63,11 +63,16 @@ class DockerExecutor(docker: DefaultDockerClient, override val contractExecution
   private def makeContractRequest(contract: Contract, body: JsValue): Task[String] = {
     startContainer(contract.stateContainerName, Some("database system is ready to accept connections")).flatMap(_ =>
       startContainer(contract.containerName)).flatMap(cs => {
-      executeCommandInContainer(cs.id(), Array[String]("/bin/sh", "-c", "apk update && apk add iptables &&" +
+      executeCommandInContainer(cs.id(), Array[String]("/bin/sh", "-c", "apk update && apk add iptables && " +
+        "NODE=$(nslookup host.docker.internal | awk -F' ' 'NR==3 { print $3 }') && " +
+        "STATE=$(ifconfig | grep -A 1 'eth0' | tail -1 | cut -d ':' -f 2 | cut -d ' ' -f 1 | sed 's/4$/3/') &&" +
         "iptables -P INPUT DROP && iptables -P OUTPUT DROP && iptables -P FORWARD DROP && " +
-        "iptables -A OUTPUT -p tcp --dport 5432 -d $(ifconfig | grep -A 1 'eth0' | tail -1 | cut -d ':' -f 2 | cut -d ' ' -f 1 | sed 's/4$/3/') -j ACCEPT && " +
-        "iptables -A INPUT -p tcp --sport 5432 -s $(ifconfig | grep -A 1 'eth0' | tail -1 | cut -d ':' -f 2 | cut -d ' ' -f 1 | sed 's/4$/3/') -j ACCEPT && " +
-        "echo \"$(ifconfig | grep -A 1 'eth0' | tail -1 | cut -d ':' -f 2 | cut -d ' ' -f 1 | sed 's/4$/3/') state\" >> /etc/hosts"), privileged = true).flatMap(_ => {
+        "iptables -A OUTPUT -p tcp --dport 5432 -d $STATE -j ACCEPT && " +
+        "iptables -A INPUT -p tcp --sport 5432 -s $STATE -j ACCEPT && " +
+        "iptables -A OUTPUT -p tcp --dport 6000 -d $NODE -j ACCEPT && " +
+        "iptables -A INPUT -p tcp --sport 6000 -s $NODE -j ACCEPT && " +
+        "echo \"$STATE state\" >> /etc/hosts && " +
+        "echo \"$NODE node\" >> /etc/hosts"), privileged = true).flatMap(_ => {
         executeCommandInContainer(cs.id(), Array[String]("/bin/sh", "-c", s"/run.sh ${StringEscapeUtils.escapeJavaScript(body.toString())}")).timeout(contractExecutionLimits.timeout.duration)
           .doOnFinish(eo => Task {
             // todo to kill or not to kill?
