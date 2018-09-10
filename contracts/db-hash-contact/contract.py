@@ -18,11 +18,8 @@ def run_process(cmd):
 def write_db_to_file():
     return run_process("pg_dump -U postgres -h state postgres -f /tmp/db.sql") + run_process("sed -e /^--/d -e /^$/d /tmp/db.sql >/tmp/db.sql")
 
-def sort_db_file():
-    return run_process("sort -o /tmp/db_sorted.sql /tmp/db.sql")
-
-def xxhash_sorted_file():
-    exit_code, out = run_process_with_output("xxhsum /tmp/db_sorted.sql")
+def xxhash_db_file():
+    exit_code, out = run_process_with_output("xxhsum /tmp/db.sql")
     return out.split()[0]
 
 def apply_operation():
@@ -39,15 +36,13 @@ if __name__ == '__main__':
     if request['command'] == 'execute':
         apply_operation()
         write_db_to_file()
-        sort_db_file()
-        print(xxhash_sorted_file())
+        print(xxhash_db_file())
 
     elif request['command'] == 'apply':
         apply_operation()
 
         write_db_to_file()
-        sort_db_file()
-        hash = xxhash_sorted_file()
+        hash = xxhash_db_file()
 
         if hash.decode() != request['result']:
             sys.exit(1)
