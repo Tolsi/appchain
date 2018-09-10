@@ -1,9 +1,5 @@
 package ru.tolsi.appchain.deploy
 
-import java.io.File
-import java.nio.charset.StandardCharsets
-
-import com.google.common.io.Files
 import com.spotify.docker.client.DefaultDockerClient
 import com.spotify.docker.client.messages.HostConfig.Bind
 import com.spotify.docker.client.messages._
@@ -14,6 +10,7 @@ import ru.tolsi.appchain.{Contract, Deployer}
 import scala.util.Try
 
 class DockerDeployer(docker: DefaultDockerClient) extends Deployer {
+//  private val statePortBindings = Map("5432" -> List(PortBinding.randomPort("0.0.0.0")).asJava)
 
   private val commonHostBuilder = HostConfig.builder
     .memory(128 * FileUtils.ONE_MB)
@@ -25,7 +22,7 @@ class DockerDeployer(docker: DefaultDockerClient) extends Deployer {
 
   private def stateHostConfig(contract: Contract, stateVolume: Volume) = commonHostBuilder
     .binds(Bind.from(stateVolume).to("/var/lib/postgresql/data").build())
-    //    .portBindings(statePortBindings.asJava)
+//    .portBindings(statePortBindings.asJava)
     .build
 
   private def deployContract(contract: Contract): Unit = {

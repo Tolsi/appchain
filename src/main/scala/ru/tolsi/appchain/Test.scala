@@ -34,12 +34,13 @@ object Test extends DefaultJsonProtocol with StrictLogging {
     //Contract("memory-allocate-contract", "localhost:5000/memory-allocate-contract")
 
     //    val c = Contract("sleep-contract", "localhost:5000/sleep-contract", 1)
-    val c = Contract("simple-sql-contact", "localhost:5000/simple-sql-contact", 1)
+    val c = Contract("db-hash-contact", "localhost:5000/db-hash-contact", 1)
 
     try {
-      val params = Map("command" -> "execute".toJson, "params" -> Map("apply_sleep" -> 0.1, "execute_sleep" -> 0.1).toJson).toJson
+//      val params = Map("command" -> "execute".toJson, "params" -> Map("apply_sleep" -> 0.1).toJson).toJson
+      val params = Map("params" -> Map("apply_sleep" -> 0.1).toJson).toJson
       val resultF = deployer.deploy(c).flatMap(_ =>
-        executor.execute(c, params)).runAsync
+        executor.apply(c, params, JsString("0a41b113c6e24196"))).runAsync
 
       val result = Await.result(resultF, 5 minutes)
 

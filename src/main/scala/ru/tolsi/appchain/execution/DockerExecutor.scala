@@ -7,7 +7,7 @@ import com.typesafe.scalalogging.StrictLogging
 import monix.eval.Task
 import org.apache.commons.lang.StringEscapeUtils
 import ru.tolsi.appchain.{Contract, ContractExecutionLimits, Executor}
-import spray.json.{DefaultJsonProtocol, JsValue}
+import spray.json.{DefaultJsonProtocol, JsString, JsValue}
 
 import scala.collection.JavaConverters._
 
@@ -41,7 +41,10 @@ class DockerExecutor(docker: DefaultDockerClient, override val contractExecution
   }
 
   private def executeCommandInContainer(containerId: String, command: Array[String], privileged: Boolean = false): Task[String] = Task {
-    val execId = docker.execCreate(containerId, command, ExecCreateParam.attachStdout(true), ExecCreateParam.privileged(privileged)).id()
+    val execId = docker.execCreate(containerId, command,
+      ExecCreateParam.attachStdout(true),
+//      ExecCreateParam.attachStderr(true),
+      ExecCreateParam.privileged(privileged)).id()
 
     var stream: LogStream = null
     try {
@@ -63,7 +66,7 @@ class DockerExecutor(docker: DefaultDockerClient, override val contractExecution
   private def makeContractRequest(contract: Contract, body: JsValue): Task[String] = {
     startContainer(contract.stateContainerName, Some("database system is ready to accept connections")).flatMap(_ =>
       startContainer(contract.containerName)).flatMap(cs => {
-      executeCommandInContainer(cs.id(), Array[String]("/bin/sh", "-c", "apk update && apk add iptables && " +
+      executeCommandInContainer(cs.id(), Array[String]("/bin/sh", "-c", "apk update && apk add --no-cache iptables && " +
         "NODE=$(nslookup host.docker.internal | awk -F' ' 'NR==3 { print $3 }') && " +
         "STATE=$(ifconfig | grep -A 1 'eth0' | tail -1 | cut -d ':' -f 2 | cut -d ' ' -f 1 | sed 's/4$/3/') &&" +
         "iptables -P INPUT DROP && iptables -P OUTPUT DROP && iptables -P FORWARD DROP && " +
@@ -100,7 +103,7 @@ class DockerExecutor(docker: DefaultDockerClient, override val contractExecution
       Task.raiseError(new IllegalArgumentException("params are too long"))
     } else if (result.toString().length > contractExecutionLimits.inputParamsMaxLength) {
       Task.raiseError(new IllegalArgumentException("result is too long"))
-    } else makeContractRequest(contract, Map("parameters" -> params, "result" -> result).toJson).flatMap(r =>
+    } else makeContractRequest(contract, Map("command" -> JsString("apply"), "parameters" -> params, "result" -> result).toJson).flatMap(r =>
       if (r.length > contractExecutionLimits.resultMaxLength) {
         Task.raiseError(new IllegalArgumentException("result is too long"))
       } else Task.now(r))
