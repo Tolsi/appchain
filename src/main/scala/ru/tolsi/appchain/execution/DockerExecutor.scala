@@ -11,6 +11,7 @@ import ru.tolsi.appchain.{Contract, ContractExecutionLimits, ExecutionInDocker, 
 import spray.json.{DefaultJsonProtocol, JsString, JsValue}
 
 import scala.collection.JavaConverters._
+import scala.util.Try
 
 object DockerExecutor {
   val DateFormat = new SimpleDateFormat("yyyy-MM-dd'T'hh:mm:ss.SSSSSSSSSX")
@@ -25,10 +26,10 @@ class DockerExecutor(override val docker: DefaultDockerClient, override val cont
       LogsParam.stdout(true),
       LogsParam.tail(100)): _*).readFully()
     val lines = all.split("\n")
-    lines.exists(line => {
+    lines.exists(line => Try {
       val lineTs = DateFormat.parse(line.split(" ").head).getTime
       lineTs > from && line.contains(str)
-    })
+    }.toOption.contains(true))
   }
 
   private def extractBindedPortFromNetworkSettings(port: Int)(settings: NetworkSettings): Int = {
