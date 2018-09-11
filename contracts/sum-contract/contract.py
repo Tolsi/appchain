@@ -8,11 +8,11 @@ if __name__ == '__main__':
             sys.exit(1)
         print(json.dumps(request['params']['a'] + request['params']['b']))
     elif request['command'] == 'apply':
-        if not request['params'] or not 'a' in request['params']['parameters'] or not 'b' in request['params']['parameters']:
+        if not request['params'] or not 'a' in request['params'] or not 'b' in request['params']:
             sys.exit(1)
 
-        a = request['params']['parameters']['a']
-        b = request['params']['parameters']['b']
+        a = request['params']['a']
+        b = request['params']['b']
         res = request['params']['result']
 
         if not a + b == res:

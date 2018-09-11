@@ -38,13 +38,18 @@ object Test extends DefaultJsonProtocol with StrictLogging {
 
     try {
 //      val params = Map("command" -> "execute".toJson, "params" -> Map("apply_sleep" -> 0.1).toJson).toJson
-      val params = Map("params" -> Map("apply_sleep" -> 0.1).toJson).toJson
-      val resultF = deployer.deploy(c).flatMap(_ =>
-        executor.apply(c, params, JsString("0a41b113c6e24196"))).runAsync
+      val params = Map("apply_sleep" -> 0.1).toJson
+      val resultExecuteF = deployer.deploy(c).flatMap(_ =>
+        executor.execute(c, params)).runAsync
 
-      val result = Await.result(resultF, 5 minutes)
+      val resultExecute = Await.result(resultExecuteF, 5 minutes)
 
-      logger.info(s"Result: $result")
+      val resultApplyF = deployer.deploy(c).flatMap(_ =>
+        executor.apply(c, params, JsString(resultExecute))).runAsync
+
+      val resultApply = Await.result(resultApplyF, 5 minutes)
+
+      logger.info(s"Result: $resultExecute")
 
       logger.info(s"Done!")
     } catch {

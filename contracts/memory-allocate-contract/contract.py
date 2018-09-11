@@ -14,11 +14,11 @@ if __name__ == '__main__':
 
         print(json.dumps(True))
     elif request['command'] == 'apply':
-        if not request['params'] or not 'allocate' in request['params']['parameters']:
+        if not request['params'] or not 'allocate' in request['params']:
             sys.exit(400)
 
         global omfg
-        omfg = bytearray(request['params']['parameters']['allocate'])
+        omfg = bytearray(request['params']['allocate'])
 
         time.sleep(2)
 

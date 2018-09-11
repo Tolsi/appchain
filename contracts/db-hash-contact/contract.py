@@ -16,11 +16,11 @@ def run_process(cmd):
     return exit_code
 
 def write_db_to_file():
-    return run_process("pg_dump -U postgres -h state postgres -f /tmp/db.sql") + run_process("sed -e /^--/d -e /^$/d /tmp/db.sql >/tmp/db.sql")
+    return run_process("pg_dump -U postgres -h state postgres -f /tmp/db.sql") + run_process("sed -i -e /^--/d -e /^$/d /tmp/db.sql")
 
 def xxhash_db_file():
     exit_code, out = run_process_with_output("xxhsum /tmp/db.sql")
-    return out.split()[0]
+    return out.split()[0].decode()
 
 def apply_operation():
     conn = psycopg2.connect("dbname='postgres' user='postgres' host='state' port=5432 password='postgres'")
@@ -43,8 +43,8 @@ if __name__ == '__main__':
 
         write_db_to_file()
         hash = xxhash_db_file()
-
-        if hash.decode() != request['result']:
+        print(hash)
+        if hash != request['result']:
             sys.exit(1)
 
         print(json.dumps(True))
