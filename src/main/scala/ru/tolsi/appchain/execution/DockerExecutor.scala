@@ -17,7 +17,7 @@ object DockerExecutor {
 }
 class DockerExecutor(override val docker: DefaultDockerClient, override val contractExecutionLimits: ContractExecutionLimits) extends Executor with DefaultJsonProtocol with ExecutionInDocker {
   import DockerExecutor._
-  private def waitInLog(containerId: String, str: String, from: Long = System.currentTimeMillis()): Task[Boolean] = Task {
+  private def waitInLog(containerId: String, str: String, from: Long): Task[Boolean] = Task {
     val all = docker.logs(containerId, Seq(
       LogsParam.timestamps(true),
       LogsParam.follow(false),
@@ -26,7 +26,8 @@ class DockerExecutor(override val docker: DefaultDockerClient, override val cont
       LogsParam.tail(100)): _*).readFully()
     val lines = all.split("\n")
     lines.exists(line => {
-      DateFormat.parse(line.split(" ").head).getTime > from && line.contains(str)
+      val lineTs = DateFormat.parse(line.split(" ").head).getTime
+      lineTs > from && line.contains(str)
     })
   }
 
@@ -39,8 +40,9 @@ class DockerExecutor(override val docker: DefaultDockerClient, override val cont
       if (!cs.state().running()) {
         docker.startContainer(containerName)
       }
+      val now = System.currentTimeMillis()
       (waitStringInLog match {
-        case Some(str) => waitInLog(cs.id(), str).restartUntil(identity)
+        case Some(str) => waitInLog(cs.id(), str, now).restartUntil(identity)
         case None => Task.unit
       }).map(_ =>
         docker.inspectContainer(containerName)
@@ -49,7 +51,7 @@ class DockerExecutor(override val docker: DefaultDockerClient, override val cont
   }
 
   private def makeContractRequest(contract: Contract, body: JsValue): Task[String] = {
-    startContainer(contract.stateContainerName, Some("database system is ready to accept connections")).flatMap(_ =>
+    startContainer(contract.stateContainerName, Some("server started")).flatMap(_ =>
       startContainer(contract.containerName)).flatMap(cs => {
       executeCommandInContainer(cs.id(), Array[String]("/bin/sh", "-c", s"/run.sh ${StringEscapeUtils.escapeJavaScript(body.toString())}")).timeout(contractExecutionLimits.timeout.duration)
         .doOnFinish(eo => Task {
