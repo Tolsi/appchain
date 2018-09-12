@@ -1,7 +1,9 @@
 package ru.tolsi.appchain
 
 import monix.eval.Task
+import spray.json.JsValue
 
 trait Deployer {
-  def deploy(contract: Contract): Task[Unit]
+  def executor: Executor
+  def deploy(contract: Contract, params: JsValue): Task[Unit]
 }

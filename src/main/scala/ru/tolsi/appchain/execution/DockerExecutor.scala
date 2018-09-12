@@ -16,8 +16,11 @@ import scala.util.Try
 object DockerExecutor {
   val DateFormat = new SimpleDateFormat("yyyy-MM-dd'T'hh:mm:ss.SSSSSSSSSX")
 }
+
 class DockerExecutor(override val docker: DefaultDockerClient, override val contractExecutionLimits: ContractExecutionLimits) extends Executor with DefaultJsonProtocol with ExecutionInDocker {
+
   import DockerExecutor._
+
   private def waitInLog(containerId: String, str: String, from: Long): Task[Boolean] = Task {
     val all = docker.logs(containerId, Seq(
       LogsParam.timestamps(true),
@@ -36,14 +39,19 @@ class DockerExecutor(override val docker: DefaultDockerClient, override val cont
     settings.ports().asScala(s"$port/tcp").asScala.head.hostPort().toInt
   }
 
-  private def startContainer(containerName: String, waitStringInLog: Option[String] = None): Task[ContainerInfo] = {
+  private def startContainer(containerName: String, waitStringInLog: Option[String] = None, afterStart: String => Task[Unit] = _ => Task.unit): Task[ContainerInfo] = {
     Task(docker.inspectContainer(containerName)).flatMap(cs => {
-      if (!cs.state().running()) {
+      val wasRunned = cs.state().running()
+      if (!wasRunned) {
         docker.startContainer(containerName)
+        afterStart(cs.id())
+      } else {
+        Task.unit
       }
+    }).flatMap(_ => {
       val now = System.currentTimeMillis()
       (waitStringInLog match {
-        case Some(str) => waitInLog(cs.id(), str, now).restartUntil(identity)
+        case Some(str) => waitInLog(containerName, str, now).restartUntil(identity)
         case None => Task.unit
       }).map(_ =>
         docker.inspectContainer(containerName)
@@ -52,9 +60,20 @@ class DockerExecutor(override val docker: DefaultDockerClient, override val cont
   }
 
   private def makeContractRequest(contract: Contract, body: JsValue): Task[String] = {
-    startContainer(contract.stateContainerName, Some("server started")).flatMap(_ =>
-      startContainer(contract.containerName)).flatMap(cs => {
-      executeCommandInContainer(cs.id(), Array[String]("/bin/sh", "-c", s"/run.sh ${StringEscapeUtils.escapeJavaScript(body.toString())}")).timeout(contractExecutionLimits.timeout.duration)
+    startContainer(contract.stateContainerName, Some("server started")).flatMap(stateContainerInfo =>
+      startContainer(contract.containerName, afterStart =
+        id =>
+          executeCommandInContainer(id, Array[String]("/bin/sh", "-c", "apk update && apk add --no-cache iptables && " +
+            "NODE=$(nslookup host.docker.internal | awk -F' ' 'NR==3 { print $3 }') && " +
+            s"STATE=${stateContainerInfo.networkSettings().ipAddress()} &&" +
+            "iptables -P INPUT DROP && iptables -P OUTPUT DROP && iptables -P FORWARD DROP && " +
+            "iptables -A OUTPUT -p tcp --dport 5432 -d $STATE -j ACCEPT && " +
+            "iptables -A INPUT -p tcp --sport 5432 -s $STATE -j ACCEPT && " +
+            "iptables -A OUTPUT -p tcp --dport 6000 -d $NODE -j ACCEPT && " +
+            "iptables -A INPUT -p tcp --sport 6000 -s $NODE -j ACCEPT && " +
+            "echo \"$STATE state\" >> /etc/hosts && " +
+            "echo \"$NODE node\" >> /etc/hosts"), privileged = true).map(_ => ()))).flatMap(contractContainerInfo => {
+      executeCommandInContainer(contractContainerInfo.id(), Array[String]("/bin/sh", "-c", s"/run.sh ${StringEscapeUtils.escapeJavaScript(body.toString())}")).timeout(contractExecutionLimits.timeout.duration)
         .doOnFinish(eo => Task {
           // todo to kill or not to kill?
           eo.foreach(_ => {
@@ -66,13 +85,21 @@ class DockerExecutor(override val docker: DefaultDockerClient, override val cont
     })
   }
 
-  override def execute(contract: Contract, params: JsValue): Task[String] = {
+  private def executeCommand(command: String, contract: Contract, params: JsValue): Task[String] = {
     if (params.toString().length > contractExecutionLimits.inputParamsMaxLength) {
       Task.raiseError(new IllegalArgumentException("params are too long"))
-    } else makeContractRequest(contract, Map("command" -> JsString("execute"), "params" -> params).toJson).flatMap(r =>
+    } else makeContractRequest(contract, Map("command" -> JsString(command), "params" -> params).toJson).flatMap(r =>
       if (r.length > contractExecutionLimits.resultMaxLength) {
         Task.raiseError(new IllegalArgumentException("result is too long"))
       } else Task.now(r))
+  }
+
+  override def execute(contract: Contract, params: JsValue): Task[String] = {
+    executeCommand("execute", contract, params)
+  }
+
+  override def init(contract: Contract, params: JsValue): Task[Unit] = {
+    executeCommand("init", contract, params).map(_ => ())
   }
 
   override def apply(contract: Contract, params: JsValue, result: JsValue): Task[String] = {

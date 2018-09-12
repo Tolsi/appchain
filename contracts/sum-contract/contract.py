@@ -17,3 +17,7 @@ if __name__ == '__main__':
 
         if not a + b == res:
             sys.exit(1)
+    elif request['command'] == 'init':
+        sys.exit(0)
+    else:
+        sys.exit(1)

@@ -48,3 +48,8 @@ if __name__ == '__main__':
             sys.exit(1)
 
         print(json.dumps(True))
+
+    elif request['command'] == 'init':
+        sys.exit(0)
+    else:
+        sys.exit(1)
