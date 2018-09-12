@@ -19,8 +19,11 @@ object App {
       DB localTx { implicit session =>
         command match {
           case "init" =>
+            val amount = params("amount").as[Long]
+            val issuer = params("issuer").as[String]
+            require(amount > 0, "amount should be positive")
             storage.init()
-            storage.updateBalance(params("issuer").as[String], params("amount").as[Long])
+            storage.updateBalance(issuer, amount)
             println()
           case "execute" | "apply" =>
             val operation = params("operation").as[String]
