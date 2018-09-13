@@ -1,7 +1,5 @@
 package ru.tolsi.appchain
 
-import java.nio.charset.StandardCharsets
-
 import akka.util.Timeout
 import com.google.common.primitives.Longs
 import com.spotify.docker.client.DefaultDockerClient
@@ -13,14 +11,14 @@ import ru.tolsi.appchain.deploy.DockerDeployer
 import ru.tolsi.appchain.execution.DockerExecutor
 import scorex.crypto.encode.Base58
 import scorex.crypto.signatures.Curve25519
-import spray.json.{DefaultJsonProtocol, _}
+import spray.json.{DefaultJsonProtocol, JsNumber, JsString, JsValue}
 
 import scala.concurrent.Await
 import scala.concurrent.duration._
 import scala.util.Try
 import scala.util.control.NonFatal
 
-object Test extends DefaultJsonProtocol with StrictLogging {
+object TokenContractCall extends DefaultJsonProtocol with StrictLogging {
   def main(args: Array[String]): Unit = {
     implicit val io: SchedulerService = Scheduler.forkJoin(10, 10)
 
@@ -86,7 +84,7 @@ object Test extends DefaultJsonProtocol with StrictLogging {
 
       val resultApply2 = Await.result(resultApplyF2, 5 minutes)
 
-      logger.info(s"Result apply: $resultApply2")
+      logger.info(s"Result apply 2: $resultApply2")
 
       logger.info(s"Done!")
     } catch {

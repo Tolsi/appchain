@@ -1,14 +1,19 @@
-package ru.tolsi.token
+package ru.tolsi.voxel
 
 import scalikejdbc._
 
-import scala.util.{Failure, Try}
-
 class TokenStorage {
-
   def init()(implicit session: DBSession): Unit = {
     sql"create table token_balance(address varchar(50) PRIMARY KEY, balance bigint NOT NULL)".update().apply()
+    sql"create table params(name varchar(50) PRIMARY KEY, value varchar(50) NOT NULL)".update().apply()
   }
+
+  def setParam(name: String, value: String)(implicit session: DBSession): Unit = {
+    sql"insert into params values($name, $value) ON CONFLICT (name) DO UPDATE SET value = $value".update().apply()
+  }
+
+  def getParam(name: String)(implicit session: DBSession): Option[String] =
+    sql"select value from params where name = $name".map(_.string(1)).headOption().apply()
 
   def balance(address: Address)(implicit session: DBSession): Long =
     sql"select balance from token_balance where address = ${address.publicKey}".map(_.long(1)).headOption().apply().getOrElse(0L)
@@ -16,12 +21,4 @@ class TokenStorage {
   def updateBalance(address: Address, balance: Long)(implicit session: DBSession): Unit =
     sql"insert into token_balance values(${address.publicKey}, $balance) ON CONFLICT (address) DO UPDATE SET balance = $balance".update().apply()
 
-  def transfer(from: Address, to: Address, amount: Long)(implicit session: DBSession): Try[Unit] = {
-    val fromBalance = balance(from)
-    val toBalance = balance(to)
-    if (fromBalance >= amount) Try {
-      updateBalance(from, Math.subtractExact(fromBalance, amount))
-      updateBalance(to, Math.addExact(toBalance, amount))
-    } else Failure(new IllegalStateException(s"$from have not enough balance: $fromBalance - $amount = ${fromBalance - amount}"))
-  }
 }

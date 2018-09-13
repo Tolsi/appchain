@@ -20,7 +20,7 @@ object App {
         command match {
           case "init" =>
             val amount = params("amount").as[Long]
-            val issuer = params("issuer").as[String]
+            val issuer = Address(params("issuer").as[String])
             require(amount > 0, "amount should be positive")
             storage.init()
             storage.updateBalance(issuer, amount)
@@ -29,7 +29,7 @@ object App {
             val operation = params("operation").as[String]
             operation match {
               case "balance" =>
-                println(storage.balance(params("address").as[String]))
+                println(storage.balance(Address(params("address").as[String])))
               case "transfer" =>
                 val t = Transfer(Address(params("from").as[String]), Address(params("to").as[String]), params("amount").as[Long], params("signature").as[String])
                 storage.transfer(t.from, t.to, t.amount).get
