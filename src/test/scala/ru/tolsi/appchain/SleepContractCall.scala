@@ -26,17 +26,17 @@ object SleepContractCall extends DefaultJsonProtocol with StrictLogging {
     docker.ping()
 
     val executor = new DockerExecutor(docker, ContractExecutionLimits(1000, 1000, Timeout(5 seconds)))
-    val deployer = new DockerDeployer(docker, executor, Timeout(5 seconds))
+    val deployer = new DockerDeployer(docker, executor, Timeout(10 seconds))
 
     val c = Contract("sleep-contract", "localhost:5000/sleep-contract", 1)
 
     try {
-      val issueParams = JsObject()
-
       val executeParams = Map[String, JsValue](
-        "init_sleep" -> JsNumber(1),
+        "init_sleep" -> JsNumber(0),
         "execute_sleep" -> JsNumber(1),
         "apply_sleep" -> JsNumber(1)).toJson
+
+      val issueParams = executeParams
 
       val resultExecuteF = deployer.deploy(c, issueParams).flatMap(_ =>
         executor.execute(c, executeParams)).runAsync

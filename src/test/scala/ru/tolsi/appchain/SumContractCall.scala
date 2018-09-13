@@ -26,7 +26,7 @@ object SumContractCall extends DefaultJsonProtocol with StrictLogging {
     docker.ping()
 
     val executor = new DockerExecutor(docker, ContractExecutionLimits(1000, 1000, Timeout(5 seconds)))
-    val deployer = new DockerDeployer(docker, executor, Timeout(5 seconds))
+    val deployer = new DockerDeployer(docker, executor, Timeout(10 seconds))
 
     val c = Contract("sum-contract", "localhost:5000/sum-contract", 1)
 

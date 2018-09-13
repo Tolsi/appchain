@@ -28,7 +28,7 @@ object VoxelContractCall extends DefaultJsonProtocol with StrictLogging {
     docker.ping()
 
     val executor = new DockerExecutor(docker, ContractExecutionLimits(1000, 1000, Timeout(5 seconds)))
-    val deployer = new DockerDeployer(docker, executor, Timeout(5 seconds))
+    val deployer = new DockerDeployer(docker, executor, Timeout(10 seconds))
 
     val c = Contract("voxel-contract-scala", "localhost:5000/voxel-contract-scala", 1)
 
