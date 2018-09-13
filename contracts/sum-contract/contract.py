@@ -13,7 +13,7 @@ if __name__ == '__main__':
 
         a = request['params']['a']
         b = request['params']['b']
-        res = request['params']['result']
+        res = int(request['result'])
 
         if not a + b == res:
             sys.exit(1)

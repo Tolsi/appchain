@@ -1,16 +1,17 @@
 package ru.tolsi.appchain.deploy
 
+import akka.util.Timeout
 import com.spotify.docker.client.DefaultDockerClient
 import com.spotify.docker.client.messages.HostConfig.Bind
 import com.spotify.docker.client.messages._
 import monix.eval.Task
 import org.apache.commons.io.FileUtils
-import ru.tolsi.appchain.{Contract, Deployer, ExecutionInDocker, Executor}
+import ru.tolsi.appchain._
 import spray.json.JsValue
 
 import scala.util.Try
 
-class DockerDeployer(override val docker: DefaultDockerClient, override val executor: Executor) extends Deployer with ExecutionInDocker {
+class DockerDeployer(override val docker: DefaultDockerClient, override val executor: Executor, timeout: Timeout) extends Deployer with ExecutionInDocker {
   //  private val statePortBindings = Map("5432" -> List(PortBinding.randomPort("0.0.0.0")).asJava)
 
   private val commonHostBuilder = HostConfig.builder
@@ -56,7 +57,7 @@ class DockerDeployer(override val docker: DefaultDockerClient, override val exec
     if (!isDeployed(contract)) {
       deployContractState(contract).flatMap(_ =>
         deployContract(contract)).flatMap(_ =>
-        executor.init(contract, params))
+        executor.init(contract, params)).timeout(timeout.duration)
     } else {
       Task.unit
     }

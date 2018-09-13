@@ -29,14 +29,8 @@ object TokenContractCall extends DefaultJsonProtocol with StrictLogging {
     docker.ping()
 
     val executor = new DockerExecutor(docker, ContractExecutionLimits(1000, 1000, Timeout(5 seconds)))
-    val deployer = new DockerDeployer(docker, executor)
+    val deployer = new DockerDeployer(docker, executor, Timeout(5 seconds))
 
-    //Contract("sum-contract", "localhost:5000/sum-contract")
-    //Contract("slow-init-contract", "localhost:5000/slow-init-contract")
-    //Contract("sleep-contract", "localhost:5000/sleep-contract")
-    //Contract("memory-allocate-contract", "localhost:5000/memory-allocate-contract")
-
-    //    val c = Contract("sleep-contract", "localhost:5000/sleep-contract", 1)
     val c = Contract("token-contract-scala", "localhost:5000/token-contract-scala", 1)
 
     val (privateKey, publicKey) = Curve25519.createKeyPair(Array[Byte](3,6,3))

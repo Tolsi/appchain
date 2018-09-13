@@ -2,12 +2,13 @@ import json
 import time
 import sys
 
+omfg = None
+
 if __name__ == '__main__':
     request = json.loads(sys.argv[1])
     if request['command'] == 'execute':
         if not request['params'] or not 'allocate' in request['params']:
             sys.exit(400)
-        global omfg
         omfg = bytearray(request['params']['allocate'])
 
         time.sleep(2)
@@ -17,7 +18,6 @@ if __name__ == '__main__':
         if not request['params'] or not 'allocate' in request['params']:
             sys.exit(400)
 
-        global omfg
         omfg = bytearray(request['params']['allocate'])
 
         time.sleep(2)

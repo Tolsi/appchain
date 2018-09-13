@@ -19,6 +19,11 @@ if __name__ == '__main__':
 
         print(json.dumps(True))
     elif request['command'] == 'init':
-        sys.exit(0)
+        if not 'execute_sleep' in request['params'] or not 'init_sleep' in request['params']:
+            sys.exit(1)
+
+        time.sleep(request['params']['init_sleep'])
+
+        print(json.dumps(True))
     else:
         sys.exit(1)

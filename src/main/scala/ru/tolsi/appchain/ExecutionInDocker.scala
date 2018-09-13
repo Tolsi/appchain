@@ -20,7 +20,8 @@ trait ExecutionInDocker extends StrictLogging {
       val inspect = docker.execInspect(execId)
       logger.debug(s"Process was finished with code ${inspect.exitCode()}: $result")
       if (inspect.exitCode() == 0) {
-        val lastString = result.split("\n").last.trim
+        val lastString = result.split("\n").flatMap(_.split("\r"))
+          .filter(_.nonEmpty).lastOption.map(_.trim).getOrElse("")
         if (lastString.contains(" ")) "" else lastString
       } else {
         throw new Exception(s"Process was failed with code ${inspect.exitCode()}")

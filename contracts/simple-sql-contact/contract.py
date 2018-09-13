@@ -25,9 +25,7 @@ if __name__ == '__main__':
         print('Database connection closed.')
         print(json.dumps(result))
     elif request['command'] == 'apply':
-        if not request.json or request.json['result'] != 1:
-            sys.exit(1)
-        print(json.dumps(True))
+        print()
     elif request['command'] == 'init':
         sys.exit(0)
     else:
