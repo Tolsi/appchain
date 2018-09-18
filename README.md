@@ -24,3 +24,7 @@ cd ../..
 3. Check examples [here](https://github.com/Tolsi/appchain/blob/master/src/test/scala/ru/tolsi/appchain/) to execute the contract with your params
 
 4. try to execute them from the IDE!
+
+# How it works
+
+![Architecture Scheme](docs/call_scheme.png)
