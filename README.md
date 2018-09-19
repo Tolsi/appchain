@@ -27,4 +27,10 @@ cd ../..
 
 # How it works
 
-![Architecture Scheme](docs/call_scheme.png)
+Execution call
+
+![Execute Architecture Scheme](docs/call_scheme.png)
+
+Validation call
+
+![Validate Architecture Scheme](docs/validate_scheme.png)
