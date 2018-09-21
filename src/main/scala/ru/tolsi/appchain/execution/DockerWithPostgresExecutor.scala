@@ -13,13 +13,13 @@ import spray.json.{DefaultJsonProtocol, JsString, JsValue}
 import scala.collection.JavaConverters._
 import scala.util.Try
 
-object DockerExecutor {
+object DockerWithPostgresExecutor {
   val DateFormat = new SimpleDateFormat("yyyy-MM-dd'T'hh:mm:ss.SSSSSSSSSX")
 }
 
-class DockerExecutor(override val docker: DefaultDockerClient, override val contractExecutionLimits: ContractExecutionLimits) extends Executor with DefaultJsonProtocol with ExecutionInDocker {
+class DockerWithPostgresExecutor(override val docker: DefaultDockerClient, override val contractExecutionLimits: ContractExecutionLimits) extends Executor with DefaultJsonProtocol with ExecutionInDocker {
 
-  import DockerExecutor._
+  import DockerWithPostgresExecutor._
 
   private def waitInLog(containerId: String, str: String, from: Long): Task[Boolean] = Task {
     val all = docker.logs(containerId, Seq(

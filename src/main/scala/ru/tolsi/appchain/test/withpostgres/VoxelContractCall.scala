@@ -1,14 +1,14 @@
-package ru.tolsi.appchain
+package ru.tolsi.appchain.test.withpostgres
 
 import akka.util.Timeout
-import com.google.common.primitives.Longs
 import com.spotify.docker.client.DefaultDockerClient
 import com.spotify.docker.client.messages.RegistryAuth
 import com.typesafe.scalalogging.StrictLogging
 import monix.execution.Scheduler
 import monix.execution.schedulers.SchedulerService
-import ru.tolsi.appchain.deploy.DockerDeployer
-import ru.tolsi.appchain.execution.DockerExecutor
+import ru.tolsi.appchain.deploy.DockerWithPostgresDeployer
+import ru.tolsi.appchain.execution.DockerWithPostgresExecutor
+import ru.tolsi.appchain.{Contract, ContractExecutionLimits}
 import scorex.crypto.encode.Base58
 import scorex.crypto.signatures.Curve25519
 import spray.json.{DefaultJsonProtocol, JsNumber, JsString, JsValue}
@@ -18,7 +18,7 @@ import scala.concurrent.duration._
 import scala.util.Try
 import scala.util.control.NonFatal
 
-object TokenContractCall extends DefaultJsonProtocol with StrictLogging {
+object VoxelContractCall extends DefaultJsonProtocol with StrictLogging {
   def main(args: Array[String]): Unit = {
     implicit val io: SchedulerService = Scheduler.forkJoin(10, 10)
 
@@ -28,24 +28,28 @@ object TokenContractCall extends DefaultJsonProtocol with StrictLogging {
 
     docker.ping()
 
-    val executor = new DockerExecutor(docker, ContractExecutionLimits(1000, 1000, Timeout(5 seconds)))
-    val deployer = new DockerDeployer(docker, executor, Timeout(5 seconds))
+    val executor = new DockerWithPostgresExecutor(docker, ContractExecutionLimits(1000, 1000, Timeout(5 seconds)))
+    val deployer = new DockerWithPostgresDeployer(docker, executor, Timeout(1 minute))
 
-    val c = Contract("token-contract-scala", "localhost:5000/token-contract-scala", 1)
+    val c = Contract("voxel-contract-scala", "localhost:5000/voxel-contract-scala", 1)
 
     val (privateKey, publicKey) = Curve25519.createKeyPair(Array[Byte](3,6,3))
     val (secondPrivateKey, secondPublicKey) = Curve25519.createKeyPair(Array[Byte](1,2,6))
 
     try {
-      val issueParams = Map[String, JsValue]("issuer" -> JsString(Base58.encode(publicKey)), "amount" -> JsNumber(1000000)).toJson
+      val issueParams = Map[String, JsValue](
+        "issuer" -> JsString(Base58.encode(publicKey)),
+        "counterparty" -> JsString(Base58.encode(secondPublicKey)),
+        "amount" -> JsNumber(1000000),
+        "penalty" -> JsNumber(0.03),
+        "until" -> JsNumber(10000000000000L)
+      ).toJson
 
-      val requestBytes = publicKey ++ secondPublicKey ++ Longs.toByteArray(2)
-      val signature = Curve25519.sign(privateKey, requestBytes)
+      val requestBytes = "repay".getBytes
+      val signature = Curve25519.sign(secondPrivateKey, requestBytes)
       val executeParams = Map[String, JsValue](
-        "operation" -> JsString("transfer"),
-        "from" -> JsString(Base58.encode(publicKey)),
-        "to" -> JsString(Base58.encode(secondPublicKey)),
-        "amount" -> JsNumber(2),
+        "operation" -> JsString("repay"),
+        "counterparty" -> JsString(Base58.encode(secondPublicKey)),
         "signature" -> JsString(Base58.encode(signature))
       ).toJson
 

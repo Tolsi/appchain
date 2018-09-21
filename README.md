@@ -21,11 +21,15 @@ docker push localhost:5000/$(basename "$PWD")
 cd ../..
 ```
 
-3. Check examples [here](https://github.com/Tolsi/appchain/blob/master/src/test/scala/ru/tolsi/appchain/) to execute the contract with your params
+3. Check examples [here](https://github.com/Tolsi/appchain/blob/master/src/main/scala/ru/tolsi/appchain/test/withpostgres) to execute the contract with your params
 
-4. try to execute them from the IDE!
+4. try to execute them from the console
 
-# How it works
+```
+sbt run
+```
+
+# How it works (with postgres scheme)
 
 Execution call
 

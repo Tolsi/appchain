@@ -1,4 +1,4 @@
-package ru.tolsi.appchain
+package ru.tolsi.appchain.test.withpostgres
 
 import akka.util.Timeout
 import com.spotify.docker.client.DefaultDockerClient
@@ -6,16 +6,17 @@ import com.spotify.docker.client.messages.RegistryAuth
 import com.typesafe.scalalogging.StrictLogging
 import monix.execution.Scheduler
 import monix.execution.schedulers.SchedulerService
-import ru.tolsi.appchain.deploy.DockerDeployer
-import ru.tolsi.appchain.execution.DockerExecutor
-import spray.json.{DefaultJsonProtocol, JsNumber, JsObject, JsString, JsValue}
+import ru.tolsi.appchain.deploy.DockerWithPostgresDeployer
+import ru.tolsi.appchain.execution.DockerWithPostgresExecutor
+import ru.tolsi.appchain.{Contract, ContractExecutionLimits}
+import spray.json.{DefaultJsonProtocol, JsObject}
 
 import scala.concurrent.Await
 import scala.concurrent.duration._
 import scala.util.Try
 import scala.util.control.NonFatal
 
-object SleepContractCall extends DefaultJsonProtocol with StrictLogging {
+object SimpleSqlContractCall extends DefaultJsonProtocol with StrictLogging {
   def main(args: Array[String]): Unit = {
     implicit val io: SchedulerService = Scheduler.forkJoin(10, 10)
 
@@ -25,18 +26,15 @@ object SleepContractCall extends DefaultJsonProtocol with StrictLogging {
 
     docker.ping()
 
-    val executor = new DockerExecutor(docker, ContractExecutionLimits(1000, 1000, Timeout(5 seconds)))
-    val deployer = new DockerDeployer(docker, executor, Timeout(10 seconds))
+    val executor = new DockerWithPostgresExecutor(docker, ContractExecutionLimits(1000, 1000, Timeout(5 seconds)))
+    val deployer = new DockerWithPostgresDeployer(docker, executor, Timeout(1 minute))
 
-    val c = Contract("sleep-contract", "localhost:5000/sleep-contract", 1)
+    val c = Contract("simple-sql-contact", "localhost:5000/simple-sql-contact", 1)
 
     try {
-      val executeParams = Map[String, JsValue](
-        "init_sleep" -> JsNumber(0),
-        "execute_sleep" -> JsNumber(1),
-        "apply_sleep" -> JsNumber(1)).toJson
+      val issueParams = JsObject()
 
-      val issueParams = executeParams
+      val executeParams = JsObject()
 
       val resultExecuteF = deployer.deploy(c, issueParams).flatMap(_ =>
         executor.execute(c, executeParams)).runAsync

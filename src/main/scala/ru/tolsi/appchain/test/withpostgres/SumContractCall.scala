@@ -1,4 +1,4 @@
-package ru.tolsi.appchain
+package ru.tolsi.appchain.test.withpostgres
 
 import akka.util.Timeout
 import com.spotify.docker.client.DefaultDockerClient
@@ -6,17 +6,17 @@ import com.spotify.docker.client.messages.RegistryAuth
 import com.typesafe.scalalogging.StrictLogging
 import monix.execution.Scheduler
 import monix.execution.schedulers.SchedulerService
-import org.apache.commons.io.FileUtils
-import ru.tolsi.appchain.deploy.DockerDeployer
-import ru.tolsi.appchain.execution.DockerExecutor
-import spray.json.{DefaultJsonProtocol, JsNumber, JsObject, JsString}
+import ru.tolsi.appchain.deploy.DockerWithPostgresDeployer
+import ru.tolsi.appchain.execution.DockerWithPostgresExecutor
+import ru.tolsi.appchain.{Contract, ContractExecutionLimits}
+import spray.json.{DefaultJsonProtocol, JsNumber, JsObject, JsString, JsValue}
 
 import scala.concurrent.Await
 import scala.concurrent.duration._
 import scala.util.Try
 import scala.util.control.NonFatal
 
-object DbHashContractCall extends DefaultJsonProtocol with StrictLogging {
+object SumContractCall extends DefaultJsonProtocol with StrictLogging {
   def main(args: Array[String]): Unit = {
     implicit val io: SchedulerService = Scheduler.forkJoin(10, 10)
 
@@ -26,19 +26,20 @@ object DbHashContractCall extends DefaultJsonProtocol with StrictLogging {
 
     docker.ping()
 
-    val executor = new DockerExecutor(docker, ContractExecutionLimits(1000, 1000, Timeout(5 seconds)))
-    val deployer = new DockerDeployer(docker, executor, Timeout(10 seconds))
+    val executor = new DockerWithPostgresExecutor(docker, ContractExecutionLimits(1000, 1000, Timeout(5 seconds)))
+    val deployer = new DockerWithPostgresDeployer(docker, executor, Timeout(1 minute))
 
-    val c = Contract("db-hash-contact", "localhost:5000/db-hash-contact", 1)
+    val c = Contract("sum-contract", "localhost:5000/sum-contract", 1)
 
     try {
       val issueParams = JsObject()
 
-      val executeParams = JsObject()
+      val executeParams = Map[String, JsValue](
+        "a" -> JsNumber(1000000),
+        "b" -> JsNumber(12)).toJson
 
       val resultExecuteF = deployer.deploy(c, issueParams).flatMap(_ =>
-        executor.execute(c, executeParams)
-      ).runAsync
+        executor.execute(c, executeParams)).runAsync
 
       val resultExecute = Await.result(resultExecuteF, 5 minutes)
 

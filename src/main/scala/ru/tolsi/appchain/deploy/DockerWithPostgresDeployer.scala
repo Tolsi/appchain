@@ -11,7 +11,7 @@ import spray.json.JsValue
 
 import scala.util.Try
 
-class DockerDeployer(override val docker: DefaultDockerClient, override val executor: Executor, timeout: Timeout) extends Deployer with ExecutionInDocker {
+class DockerWithPostgresDeployer(override val docker: DefaultDockerClient, override val executor: Executor, timeout: Timeout) extends Deployer with ExecutionInDocker {
   //  private val statePortBindings = Map("5432" -> List(PortBinding.randomPort("0.0.0.0")).asJava)
 
   private val commonHostBuilder = HostConfig.builder
