@@ -98,8 +98,8 @@ class DockerWithPostgresExecutor(override val docker: DefaultDockerClient, overr
     executeCommand("execute", contract, params)
   }
 
-  override def init(contract: Contract, params: JsValue): Task[Unit] = {
-    executeCommand("init", contract, params).map(_ => ())
+  override def init(contract: Contract, params: JsValue): Task[String] = {
+    executeCommand("init", contract, params)
   }
 
   override def apply(contract: Contract, params: JsValue, result: JsValue): Task[String] = {

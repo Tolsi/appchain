@@ -1,0 +1,68 @@
+package ru.tolsi.appchain.execution
+
+import com.spotify.docker.client.DefaultDockerClient
+import com.spotify.docker.client.DockerClient.LogsParam
+import com.spotify.docker.client.messages.{ContainerInfo, NetworkSettings}
+import monix.eval.Task
+import org.apache.commons.lang.StringEscapeUtils
+import ru.tolsi.appchain.{Contract, ContractExecutionLimits, ExecutionInDocker, Executor}
+import spray.json.{DefaultJsonProtocol, JsString, JsValue}
+
+import scala.collection.JavaConverters._
+import scala.util.Try
+
+
+class DockerExecutor(override val docker: DefaultDockerClient, override val contractExecutionLimits: ContractExecutionLimits) extends Executor with DefaultJsonProtocol with ExecutionInDocker {
+
+  private def startContainer(containerName: String, afterStart: String => Task[Unit] = _ => Task.unit): Task[ContainerInfo] = {
+    Task(docker.inspectContainer(containerName)).flatMap(cs => {
+      val wasRunned = cs.state().running()
+      if (!wasRunned) {
+        docker.startContainer(containerName)
+        afterStart(cs.id())
+      } else {
+        Task.unit
+      }
+    }).map(_ => {
+      docker.inspectContainer(containerName)
+    })
+  }
+
+  private def makeContractRequest(contract: Contract, body: JsValue): Task[String] = {
+      startContainer(contract.containerName, afterStart =
+        id =>
+          executeCommandInContainer(id, Array[String]("/bin/sh", "-c", "apk update && apk add --no-cache iptables && " +
+            "NODE=$(nslookup host.docker.internal | awk -F' ' 'NR==3 { print $3 }') && " +
+            "iptables -P INPUT DROP && iptables -P OUTPUT DROP && iptables -P FORWARD DROP && " +
+            "iptables -A OUTPUT -p tcp --dport 6000 -d $NODE -j ACCEPT && " +
+            "iptables -A INPUT -p tcp --sport 6000 -s $NODE -j ACCEPT && " +
+            "echo \"$NODE node\" >> /etc/hosts"), privileged = true).map(_ => ())).flatMap(contractContainerInfo => {
+      executeCommandInContainer(contractContainerInfo.id(), Array[String]("/bin/sh", "-c", s"/run.sh ${StringEscapeUtils.escapeJavaScript(body.toString())}")).timeout(contractExecutionLimits.timeout.duration)
+        .doOnFinish(eo => Task {
+          // todo to kill or not to kill?
+          eo.foreach(_ => {
+            docker.stopContainer(contract.containerName, 1)
+          })
+        })
+    })
+  }
+
+  private def executeCommand(command: String, contract: Contract, params: JsValue): Task[String] = {
+    if (params.toString().length > contractExecutionLimits.inputParamsMaxLength) {
+      Task.raiseError(new IllegalArgumentException("params are too long"))
+    } else makeContractRequest(contract, Map("command" -> JsString(command), "params" -> params).toJson).flatMap(r =>
+      if (r.length > contractExecutionLimits.resultMaxLength) {
+        Task.raiseError(new IllegalArgumentException("result is too long"))
+      } else Task.now(r))
+  }
+
+  override def execute(contract: Contract, params: JsValue): Task[String] = {
+    executeCommand("execute", contract, params)
+  }
+
+  override def init(contract: Contract, params: JsValue): Task[String] = {
+    executeCommand("init", contract, params)
+  }
+
+  override def apply(contract: Contract, params: JsValue, result: JsValue): Task[String] = Task.raiseError(new IllegalStateException("Can't apply in this smart contract model"))
+}

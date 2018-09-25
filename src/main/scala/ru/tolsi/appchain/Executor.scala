@@ -10,5 +10,5 @@ trait Executor {
 
   def apply(contract: Contract, params: JsValue, result: JsValue): Task[String]
 
-  def init(contract: Contract, params: JsValue): Task[Unit]
+  def init(contract: Contract, params: JsValue): Task[String]
 }

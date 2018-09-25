@@ -5,5 +5,5 @@ import spray.json.JsValue
 
 trait Deployer {
   def executor: Executor
-  def deploy(contract: Contract, params: JsValue): Task[Unit]
+  def deploy(contract: Contract, params: JsValue): Task[String]
 }

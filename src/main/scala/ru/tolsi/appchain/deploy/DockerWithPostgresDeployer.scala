@@ -53,13 +53,13 @@ class DockerWithPostgresDeployer(override val docker: DefaultDockerClient, overr
     Try(docker.inspectContainer(contract.containerName)).toEither.isRight
   }
 
-  override def deploy(contract: Contract, params: JsValue): Task[Unit] = {
+  override def deploy(contract: Contract, params: JsValue): Task[String] = {
     if (!isDeployed(contract)) {
       deployContractState(contract).flatMap(_ =>
         deployContract(contract)).flatMap(_ =>
         executor.init(contract, params)).timeout(timeout.duration)
     } else {
-      Task.unit
+      Task.now("[]")
     }
   }
 }
